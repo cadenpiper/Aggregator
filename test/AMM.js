@@ -141,7 +141,7 @@ describe('AMM', () => {
       balance = await token2.balanceOf(investor1.address)
       console.log(`investor1 token2 balance before swap: ${ethers.utils.formatEther(balance)}\n`)
 
-      // Estimate amountof tokens investoe1 will receive after swapping token1: include slippage
+      // Estimate amountof tokens investor1 will receive after swapping token1: include slippage
       estimate = await amm.calculateToken1Swap(tokens(1))
       console.log(`token2 amount investor1 will receive after swap: ${ethers.utils.formatEther(estimate)}\n`)
 

@@ -104,7 +104,7 @@ contract AMM {
             token2Amount--;
         }
 
-        require(token2Amount < token2Balance, "swap amount to large");
+        require(token2Amount < token2Balance, "swap amount too large");
     }
 
     function swapToken1(uint256 _token1Amount)
@@ -148,7 +148,7 @@ contract AMM {
             token1Amount--;
         }
 
-        require(token1Amount < token1Balance, "swap amount to large");
+        require(token1Amount < token1Balance, "swap amount too large");
     }
 
     function swapToken2(uint256 _token2Amount)
