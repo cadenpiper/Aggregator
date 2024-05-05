@@ -11,7 +11,8 @@ const shares = ether
 describe('Aggregator', () => {
 	let accounts,
 			deployer,
-			liquidityProvider
+			liquidityProvider,
+			investor1
 
 	let token1,
 			token2,
@@ -96,7 +97,7 @@ describe('Aggregator', () => {
 			expect(await aggregator.token2Balance()).to.equal(tokens(500))
 		})
 
-		it('checks shares', async () => {
+		it('calculates shares', async () => {
 			expect(await aggregator.shares(liquidityProvider.address)).to.equal(tokens(100))
 			expect(await aggregator.totalShares()).to.equal(tokens(100))
 		})
@@ -106,44 +107,45 @@ describe('Aggregator', () => {
 			expect(await aggregator.calculateToken2Deposit(tokens(500)))
 		})
 	})
-})
+
+	describe('Calculating Swap Prices', () => {
+		let transaction
+
+		beforeEach(async () => {
+			
+			transaction = await token1.connect(deployer).transfer(liquidityProvider.address, tokens(10000))
+			await transaction.wait()
+			transaction = await token2.connect(deployer).transfer(liquidityProvider.address, tokens(10000))
+			await transaction.wait()
+
+			transaction = await token1.connect(liquidityProvider).approve(amm1.address, tokens(1000))
+			await transaction.wait()
+			transaction = await token2.connect(liquidityProvider).approve(amm1.address, tokens(1000))
+			await transaction.wait()
+			transaction = await token1.connect(liquidityProvider).approve(amm2.address, tokens(1000))
+			await transaction.wait()
+			transaction = await token2.connect(liquidityProvider).approve(amm2.address, tokens(1000))
+			await transaction.wait()
+
+			transaction = await amm1.connect(liquidityProvider).addLiquidity(tokens(500), tokens(1000))
+			await transaction.wait()
+			transaction = await amm2.connect(liquidityProvider).addLiquidity(tokens(1000), tokens(500))
+			await transaction.wait()
+		})
+
+		it('gets best token1 price and amm', async () => {
+			const[bestToken1Output, bestAmm] = await aggregator.getBestToken1Price(tokens(100))
+
+			expect(await bestToken1Output).to.be.gt(0)
+			expect(await bestAmm).to.not.be.null
+		})
+
+		it('gets best token2 price and amm', async () => {
+			const[bestToken2Output, bestAmm] = await aggregator.getBestToken2Price(tokens(100))
+
+			expect(await bestToken2Output).to.be.gt(0)
+			expect(await bestAmm).to.not.be.null
+		})
+	})
 	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+})
