@@ -85,26 +85,51 @@ contract Aggregator {
 	}
 
 	// Determines best token1 output with token2 input
-	function getBestToken1Price(uint256 _token2Amount) public view returns (uint256, address) {
-		uint256 token1OutputAmm1 = amm1.calculateToken2Swap(_token2Amount);
-		uint256 token1OutputAmm2 = amm2.calculateToken2Swap(_token2Amount);
+	function getBestToken1Price(uint256 _token1Amount) public view returns (uint256, address) {
+		uint256 token2OutputAmm1 = amm1.calculateToken1Swap(_token1Amount);
+		uint256 token2OutputAmm2 = amm2.calculateToken1Swap(_token1Amount);
 
-		if (token1OutputAmm1 > token1OutputAmm2) {
-			return(token1OutputAmm2, address(amm2));
+		if (token2OutputAmm1 > token2OutputAmm2) {
+			return(token2OutputAmm1, address(amm1));
 		} else {
-			return(token1OutputAmm1, address(amm1));
+			return(token2OutputAmm2, address(amm2));
 		}
 	}
 
 	// Determines best token2 output with token1 input
-	function getBestToken2Price(uint256 _token1Amount) public view returns (uint256, address) {
-		uint256 token2OutputAmm1 = amm1.calculateToken2Swap(_token1Amount);
-		uint256 token2OutputAmm2 = amm2.calculateToken2Swap(_token1Amount);
+	function getBestToken2Price(uint256 _token2Amount) public view returns (uint256, address) {
+		uint256 token1OutputAmm1 = amm1.calculateToken2Swap(_token2Amount);
+		uint256 token1OutputAmm2 = amm2.calculateToken2Swap(_token2Amount);
 
-		if(token2OutputAmm1 > token2OutputAmm2) {
-			return(token2OutputAmm2, address(amm2));
+		if (token1OutputAmm1 > token1OutputAmm2) {
+			return(token1OutputAmm1, address(amm1));
 		} else {
-			return(token2OutputAmm1, address(amm1));
+			return(token1OutputAmm2, address(amm2));
 		}
 	}
+
+	function executeSwapToken1(uint256 _token1Amount) external returns (uint256, uint256) {
+		(uint256 expectedToken2Output, address amm) = getBestToken1Price(_token1Amount);
+
+		if (amm == address(amm1)) {
+			uint256 token2Output = amm1.swapToken1(_token1Amount);
+			return (expectedToken2Output, token2Output);
+		} else {
+			uint256 token2Output = amm2.swapToken1(_token1Amount);
+			return (expectedToken2Output, token2Output);
+		}
+	}
+
+	function executeSwapToken2(uint256 _token2Amount) external returns (uint256, uint256) {
+		(uint256 expectedToken2Output, address amm) = getBestToken2Price(_token2Amount);
+
+		if(amm == address(amm1)) {
+			uint256 token2Output = amm1.swapToken2(_token2Amount);
+			return (expectedToken2Output, token2Output);
+		} else {
+			uint256 token2Output = amm2.swapToken2(_token2Amount);
+			return (expectedToken2Output, token2Output);
+		}
+	}
+
 }
