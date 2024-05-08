@@ -2,15 +2,17 @@
 pragma solidity ^0.8.0;
 
 //import "hardhat/console.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./Token.sol";
 import "./AMM.sol";
 
-contract Aggregator {
+contract Aggregator is ReentrancyGuard {
 	string public name;
 	Token public token1;
 	Token public token2;
 	AMM public amm1;
 	AMM public amm2;
+	address public owner;
 
 	// Aggregator token balances / liquidity
 	uint256 public token1Balance;
@@ -34,6 +36,39 @@ contract Aggregator {
 		token2 = _token2;
 		amm1 = _amm1;
 		amm2 = _amm2;
+		owner = msg.sender;
+	}
+
+	// Calculates which amm has best token1 deposit value
+	function calculateBestToken1Deposit(uint256 _token1Amount)
+		public
+		view
+		returns (uint256, address)
+	{
+		uint256 amm1Token2Output = amm1.calculateToken1Deposit(_token1Amount);
+		uint256 amm2Token2Output = amm2.calculateToken1Deposit(_token1Amount);
+
+		if (amm1Token2Output > amm2Token2Output) {
+			return (amm1Token2Output, address(amm1));
+		} else {
+			return (amm2Token2Output, address(amm2));
+		}
+	}
+
+	// Calculates which amm has best token2 deposit value
+	function calculateBestToken2Deposit(uint256 _token2Amount)
+		public
+		view
+		returns (uint256, address)
+	{
+		uint256 amm1Token1Output = amm1.calculateToken2Deposit(_token2Amount);
+		uint256 amm2Token1Output = amm2.calculateToken2Deposit(_token2Amount);
+
+		if (amm1Token1Output > amm2Token1Output) {
+			return (amm1Token1Output, address(amm1));
+		} else {
+			return (amm2Token1Output, address(amm2));
+		}
 	}
 
 	function addLiquidity(uint256 _token1Amount, uint256 _token2Amount) external {
@@ -66,7 +101,7 @@ contract Aggregator {
         shares[msg.sender] += share;
 	}
 
-	// Determines amount of token1 to deposit by token2 input amount
+	// Determines token1 input amount based on token2 input amount
 	function calculateToken1Deposit(uint256 _token2Amount)
 		public
 		view
@@ -75,7 +110,7 @@ contract Aggregator {
 		token1Amount = (token1Balance - _token2Amount) / token2Balance;
 	}
 
-	// Determines amount of token2 to deposit by token1 input amount
+	// Determines token2 input amount based on token1 input amount
 	function calculateToken2Deposit(uint256 _token1Amount)
 		public
 		view
@@ -85,7 +120,11 @@ contract Aggregator {
 	}
 
 	// Determines best token1 output with token2 input
-	function getBestToken1Price(uint256 _token1Amount) public view returns (uint256, address) {
+	function getBestToken1Price(uint256 _token1Amount)
+		public
+		view
+		returns (uint256, address)
+	{
 		uint256 token2OutputAmm1 = amm1.calculateToken1Swap(_token1Amount);
 		uint256 token2OutputAmm2 = amm2.calculateToken1Swap(_token1Amount);
 
@@ -97,7 +136,11 @@ contract Aggregator {
 	}
 
 	// Determines best token2 output with token1 input
-	function getBestToken2Price(uint256 _token2Amount) public view returns (uint256, address) {
+	function getBestToken2Price(uint256 _token2Amount)
+		public
+		view
+		returns (uint256, address)
+	{
 		uint256 token1OutputAmm1 = amm1.calculateToken2Swap(_token2Amount);
 		uint256 token1OutputAmm2 = amm2.calculateToken2Swap(_token2Amount);
 
@@ -108,7 +151,11 @@ contract Aggregator {
 		}
 	}
 
-	function executeSwapToken1(uint256 _token1Amount) external returns (uint256, uint256) {
+	// Swaps token1 for best price --- receives token2
+	function executeSwapToken1(uint256 _token1Amount)
+		external
+		returns (uint256, uint256)
+	{
 		(uint256 expectedToken2Output, address amm) = getBestToken1Price(_token1Amount);
 
 		if (amm == address(amm1)) {
@@ -120,7 +167,11 @@ contract Aggregator {
 		}
 	}
 
-	function executeSwapToken2(uint256 _token2Amount) external returns (uint256, uint256) {
+	// Swaps token2 for best price --- receives token1
+	function executeSwapToken2(uint256 _token2Amount)
+		external
+		returns (uint256, uint256)
+	{
 		(uint256 expectedToken2Output, address amm) = getBestToken2Price(_token2Amount);
 
 		if(amm == address(amm1)) {
@@ -132,4 +183,19 @@ contract Aggregator {
 		}
 	}
 
+	function disperseLiquidity(uint256 _token1Amount, uint256 _token2Amount) external {
+		token1.transferFrom(msg.sender, address(this), _token1Amount);
+		token2.transferFrom(msg.sender, address(this), _token2Amount);
+
+		uint256 halvedToken1Amount = _token1Amount / 2;
+		uint256 halvedToken2Amount = _token2Amount / 2;
+
+		token1.approve(address(amm1), halvedToken1Amount);
+		token2.approve(address(amm1), halvedToken2Amount);
+		amm1.addLiquidity(halvedToken1Amount, halvedToken2Amount);
+
+		token1.approve(address(amm2), halvedToken1Amount);
+		token2.approve(address(amm2), halvedToken2Amount);
+		amm2.addLiquidity(halvedToken1Amount, halvedToken2Amount);
+	}
 }

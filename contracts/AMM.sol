@@ -162,7 +162,7 @@ contract AMM {
         token2.transferFrom(tx.origin, address(this), _token2Amount);
         token2Balance += _token2Amount;
         token1Balance -= token1Amount;
-        token1.transfer(msg.sender, token1Amount);
+        token1.transfer(tx.origin, token1Amount);
 
         // Emit an event
         emit Swap(
