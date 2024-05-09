@@ -14,6 +14,14 @@ contract Aggregator is ReentrancyGuard {
 	AMM public amm2;
 	address public owner;
 
+	uint256 public allocatedToken1Balance;
+    uint256 public allocatedToken2Balance;
+    uint256 public K;
+
+    uint256 public totalShares;
+    mapping(address => uint256) public shares;
+    uint256 constant PRECISION = 10**18;
+
 	constructor(
 		string memory _name,
 		Token _token1,
@@ -61,17 +69,46 @@ contract Aggregator is ReentrancyGuard {
 		}
 	}
 
-	function addLiquidity(uint256 _token1Amount, uint256 _token2Amount) external {
-		// Adds liquidity
-		require(
-			token1.transferFrom(msg.sender, address(this), _token1Amount),
-			"failed token1 transferFrom"
-		);
-		require(
-			token2.transferFrom(msg.sender, address(this), _token2Amount),
-			"failed token2 transferFrom"
-		);
+    function addLiquidity(uint256 _token1Amount, uint256 _token2Amount) external {
+	    // Deposit Tokens
+	    require(
+	        token1.transferFrom(msg.sender, address(this), _token1Amount),
+	        "failed to transfer token 1"
+	    );
+	    require(
+	        token2.transferFrom(msg.sender, address(this), _token2Amount),
+	        "failed to transfer token 2"
+	    );
 
+	    diversifyLiquidity(_token1Amount, _token2Amount);
+
+	    // Issue Shares
+        uint256 share;
+
+        // If first time adding liquidity, make share 100
+        if (totalShares == 0) {
+            share = 100 * PRECISION;
+        } else {
+            uint256 share1 = (totalShares * _token1Amount) / allocatedToken1Balance;
+            uint256 share2 = (totalShares * _token2Amount) / allocatedToken2Balance;
+            require(
+                (share1 / 10**3) == (share2 / 10**3),
+                "must provide equal token amounts"
+            );
+            share = share1;
+        }
+
+	    // Manage Pool
+	    allocatedToken1Balance += _token1Amount;
+	    allocatedToken2Balance += _token2Amount;
+	    K = allocatedToken1Balance * allocatedToken2Balance;
+
+	    // Updates shares
+        totalShares += share;
+        shares[msg.sender] += share;
+	}
+
+	function diversifyLiquidity(uint256 _token1Amount, uint256 _token2Amount) internal {
 		uint256 halvedToken1Amount = _token1Amount / 2;
 		uint256 halvedToken2Amount = _token2Amount / 2;
 
@@ -83,8 +120,6 @@ contract Aggregator is ReentrancyGuard {
 		amm1.addLiquidity(halvedToken1Amount, halvedToken2Amount);
 		amm2.addLiquidity(halvedToken1Amount, halvedToken2Amount);
 	}
-
-
 
 	// Determines best token1 output with token2 input
 	function getBestToken1Price(uint256 _token1Amount)

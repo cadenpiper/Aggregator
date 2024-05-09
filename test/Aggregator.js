@@ -172,9 +172,15 @@ describe('Aggregator', () => {
 			await transaction.wait()
 			transaction = await token2.connect(liquidityProvider).approve(aggregator.address, tokens(500))
 			await transaction.wait()
+
+			// Investor1 approves tokens for aggregator
+			transaction = await token1.connect(investor1).approve(aggregator.address, tokens(250))
+			await transaction.wait()
+			transaction = await token2.connect(investor1).approve(aggregator.address, tokens(250))
+			await transaction.wait()
 		})
 
-		it('adds liquidity', async () => {
+		it('diversifies liquidity', async () => {
 			// amm1 balances before adding liquidity
 			const amm1Token1BalanceBefore = await amm1.token1Balance()
 			const amm1Token2BalanceBefore = await amm1.token2Balance()
@@ -189,6 +195,34 @@ describe('Aggregator', () => {
 
 			expect(amm1Token1BalanceAfter).to.be.gt(amm1Token1BalanceBefore)
 			expect(amm1Token2BalanceAfter).to.be.gt(amm1Token2BalanceBefore)
+		})
+
+		it('calculates shares', async () => {
+			// Liquidity provider and investor1 add liquidity
+			transaction = await aggregator.connect(liquidityProvider).addLiquidity(tokens(500), tokens(500))
+			await transaction.wait()
+			transaction = await aggregator.connect(investor1).addLiquidity(tokens(250), tokens(250))
+			await transaction.wait()
+
+			// Calculates shares
+			expect(await aggregator.shares(liquidityProvider.address)).to.equal(tokens(100))
+			expect(await aggregator.shares(investor1.address)).to.equal(tokens(50))
+		})
+
+		it('manages liquidity', async () => {
+			// Liquidity provider adds liquidity
+			transaction = await aggregator.connect(liquidityProvider).addLiquidity(tokens(500), tokens(500))
+			await transaction.wait()
+
+			// Check if liquidity was diversified
+			expect(await amm1.token1Balance()).to.equal(tokens(250))
+			expect(await amm2.token1Balance()).to.equal(tokens(250))
+			expect(await amm1.token2Balance()).to.equal(tokens(250))
+			expect(await amm2.token2Balance()).to.equal(tokens(250))
+
+			// Calculates allocated liquidity
+			expect(await aggregator.allocatedToken1Balance()).to.equal(tokens(500))
+			expect(await aggregator.allocatedToken2Balance()).to.equal(tokens(500))
 		})
 	})
 
