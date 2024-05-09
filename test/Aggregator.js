@@ -83,40 +83,6 @@ describe('Aggregator', () => {
 		})
 	})
 
-	describe('Liquidity', () => {
-		let transaction
-
-		beforeEach(async () => {
-			// Liquidity provider approves tokens for aggregator
-			transaction = await token1.connect(liquidityProvider).approve(aggregator.address, tokens(10000))
-			await transaction.wait()
-			transaction = await token2.connect(liquidityProvider).approve(aggregator.address, tokens(10000))
-			await transaction.wait()
-
-			// Liquidity provider adds liquidity to aggregator
-			transaction = await aggregator.connect(liquidityProvider).addLiquidity(tokens(500), tokens(500))
-			await transaction.wait()
-		})
-
-		it('receives liquidity', async () => {
-			expect(await token1.balanceOf(liquidityProvider.address)).to.equal(tokens(399500))
-			expect(await token1.allowance(liquidityProvider.address, aggregator.address)).to.equal(tokens(9500))
-
-			expect(await aggregator.token1Balance()).to.equal(tokens(500))
-			expect(await aggregator.token2Balance()).to.equal(tokens(500))
-		})
-
-		it('calculates shares', async () => {
-			expect(await aggregator.shares(liquidityProvider.address)).to.equal(tokens(100))
-			expect(await aggregator.totalShares()).to.equal(tokens(100))
-		})
-
-		it('calculates deposits', async () => {
-			expect(await aggregator.calculateToken1Deposit(tokens(500)))
-			expect(await aggregator.calculateToken2Deposit(tokens(500)))
-		})
-	})
-
 	describe('Calculating Deposits', () => {
 		let transaction
 
@@ -197,6 +163,35 @@ describe('Aggregator', () => {
 		})
 	})
 
+	describe('Adding Liquidity', () => {
+		let transaction
+
+		beforeEach(async () => {
+			// Liqudity provider approves tokens for aggregator
+			transaction = await token1.connect(liquidityProvider).approve(aggregator.address, tokens(500))
+			await transaction.wait()
+			transaction = await token2.connect(liquidityProvider).approve(aggregator.address, tokens(500))
+			await transaction.wait()
+		})
+
+		it('adds liquidity', async () => {
+			// amm1 balances before adding liquidity
+			const amm1Token1BalanceBefore = await amm1.token1Balance()
+			const amm1Token2BalanceBefore = await amm1.token2Balance()
+
+			// Add liquidity
+			transaction = await aggregator.connect(liquidityProvider).addLiquidity(tokens(500), tokens(500))
+			await transaction.wait()
+
+			// amm2 balances after adding liquidity
+			const amm1Token1BalanceAfter = await amm1.token1Balance()
+			const amm1Token2BalanceAfter = await amm1.token2Balance()
+
+			expect(amm1Token1BalanceAfter).to.be.gt(amm1Token1BalanceBefore)
+			expect(amm1Token2BalanceAfter).to.be.gt(amm1Token2BalanceBefore)
+		})
+	})
+
 	describe('Swapping Tokens', () => {
 		let transaction
 
@@ -216,8 +211,6 @@ describe('Aggregator', () => {
 			await transaction.wait()
 
 			// Liquidity provider adds liquidity to aggregator and AMMs
-			transaction = await aggregator.connect(liquidityProvider).addLiquidity(tokens(50000), tokens(50000))
-			await transaction.wait()
 			transaction = await amm1.connect(liquidityProvider).addLiquidity(tokens(10000), tokens(50000))
 			await transaction.wait()
 			transaction = await amm2.connect(liquidityProvider).addLiquidity(tokens(50000), tokens(10000))
@@ -272,35 +265,5 @@ describe('Aggregator', () => {
 			expect(amm2BalanceAfter).to.be.gt(amm2BalanceBefore)
 		})
 	})
-
-	describe('Dispersing Liquidity', () => {
-		let transaction
-
-		beforeEach(async () => {
-			transaction = await token1.connect(liquidityProvider).approve(amm1.address, tokens(1000))
-			await transaction.wait()
-			transaction = await token2.connect(liquidityProvider).approve(amm1.address, tokens(1000))
-			await transaction.wait()
-			transaction = await token1.connect(liquidityProvider).approve(amm2.address, tokens(1000))
-			await transaction.wait()
-			transaction = await token2.connect(liquidityProvider).approve(amm2.address, tokens(1000))
-			await transaction.wait()
-
-			transaction = await amm1.connect(liquidityProvider).addLiquidity(tokens(1000), tokens(1000))
-			await transaction.wait()
-			transaction = await amm2.connect(liquidityProvider).addLiquidity(tokens(1000), tokens(1000))
-			await transaction.wait()
-
-			transaction = await token1.connect(liquidityProvider).approve(aggregator.address, tokens(1000))
-			await transaction.wait()
-			transaction = await token2.connect(liquidityProvider).approve(aggregator.address, tokens(1000))
-			await transaction.wait()
-		})
-
-		it('adds liquidity to amms', async () => {
-			transaction = await aggregator.connect(liquidityProvider).disperseLiquidity(tokens(100), tokens(100))
-			await transaction.wait()
-		})
-	})
-
+	
 })

@@ -115,10 +115,10 @@ contract AMM {
         token2Amount = calculateToken1Swap(_token1Amount);
 
         // Do Swap
-        token1.transferFrom(tx.origin, address(this), _token1Amount);
+        token1.transferFrom(msg.sender, address(this), _token1Amount);
         token1Balance += _token1Amount;
         token2Balance -= token2Amount;
-        token2.transfer(tx.origin, token2Amount);
+        token2.transfer(msg.sender, token2Amount);
 
         // Emit an event
         emit Swap(
@@ -159,10 +159,10 @@ contract AMM {
         token1Amount = calculateToken2Swap(_token2Amount);
 
         // Do Swap
-        token2.transferFrom(tx.origin, address(this), _token2Amount);
+        token2.transferFrom(msg.sender, address(this), _token2Amount);
         token2Balance += _token2Amount;
         token1Balance -= token1Amount;
-        token1.transfer(tx.origin, token1Amount);
+        token1.transfer(msg.sender, token1Amount);
 
         // Emit an event
         emit Swap(
