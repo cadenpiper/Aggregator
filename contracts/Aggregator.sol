@@ -121,7 +121,18 @@ contract Aggregator is ReentrancyGuard {
 		amm2.addLiquidity(halvedToken1Amount, halvedToken2Amount);
 	}
 
-	// Determines best token1 output with token2 input
+	// Determines how many tokens will be withdrawn
+    function calculateWithdrawAmount(uint256 _share)
+        public
+        view
+        returns(uint256 token1Amount, uint256 token2Amount)
+    {
+        require(_share <= totalShares, "Must be less than total shares");
+        token1Amount = (_share * allocatedToken1Balance) / totalShares;
+        token2Amount = (_share * allocatedToken2Balance) / totalShares;
+    }
+
+	// Determines best token2 output with token1 input
 	function getBestToken1Price(uint256 _token1Amount)
 		public
 		view
@@ -137,7 +148,7 @@ contract Aggregator is ReentrancyGuard {
 		}
 	}
 
-	// Determines best token2 output with token1 input
+	// Determines best token1 output with token2 input
 	function getBestToken2Price(uint256 _token2Amount)
 		public
 		view

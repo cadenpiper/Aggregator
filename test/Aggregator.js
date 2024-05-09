@@ -163,7 +163,7 @@ describe('Aggregator', () => {
 		})
 	})
 
-	describe('Adding Liquidity', () => {
+	describe('Liquidity', () => {
 		let transaction
 
 		beforeEach(async () => {
@@ -180,7 +180,7 @@ describe('Aggregator', () => {
 			await transaction.wait()
 		})
 
-		it('diversifies liquidity', async () => {
+		it('adds and diversifies liquidity', async () => {
 			// amm1 balances before adding liquidity
 			const amm1Token1BalanceBefore = await amm1.token1Balance()
 			const amm1Token2BalanceBefore = await amm1.token2Balance()
@@ -223,6 +223,33 @@ describe('Aggregator', () => {
 			// Calculates allocated liquidity
 			expect(await aggregator.allocatedToken1Balance()).to.equal(tokens(500))
 			expect(await aggregator.allocatedToken2Balance()).to.equal(tokens(500))
+		})
+	})
+
+	describe('Removing Liquidity', () => {
+		let transaction
+
+		beforeEach(async () => {
+			// Liqudity provider approves tokens for aggregator
+			transaction = await token1.connect(liquidityProvider).approve(aggregator.address, tokens(500))
+			await transaction.wait()
+			transaction = await token2.connect(liquidityProvider).approve(aggregator.address, tokens(500))
+			await transaction.wait()
+
+			// Add liquidity
+			transaction = await aggregator.connect(liquidityProvider).addLiquidity(tokens(500), tokens(500))
+			await transaction.wait()
+		})
+
+		it('calculates withdraw amount', async () => {
+			// Calculate liquidity providers total shares
+			expect(await aggregator.shares(liquidityProvider.address)).to.equal(tokens(100))
+			
+			// Liquidity provider calculates withdraw amount for 50 shares
+			const [token1Amount, token2Amount] = await aggregator.connect(liquidityProvider).calculateWithdrawAmount(tokens(50))
+			
+			expect(token1Amount).to.equal(tokens(250))
+			expect(token2Amount).to.equal(tokens(250))
 		})
 	})
 
