@@ -14,8 +14,8 @@ contract Aggregator is ReentrancyGuard {
 	AMM public amm2;
 	address public owner;
 
-	uint256 public allocatedToken1Balance;
-    uint256 public allocatedToken2Balance;
+	uint256 public token1Balance;
+    uint256 public token2Balance;
     uint256 public K;
 
     uint256 public totalShares;
@@ -37,60 +37,44 @@ contract Aggregator is ReentrancyGuard {
 		owner = msg.sender;
 	}
 
-	// Calculates which amm has best token1 deposit value
-	function calculateBestToken1Deposit(uint256 _token1Amount)
-		public
-		view
-		returns (uint256, address)
-	{
-		uint256 amm1Token2Output = amm1.calculateToken1Deposit(_token1Amount);
-		uint256 amm2Token2Output = amm2.calculateToken1Deposit(_token1Amount);
+	// Determines how much of token1 to deposit with token2
+    function calculateToken1Deposit(uint256 _token2Amount)
+        public
+        view
+        returns (uint256 token1Amount)
+    {
+        token1Amount = (token1Balance * _token2Amount) / token2Balance;
+    }
 
-		if (amm1Token2Output > amm2Token2Output) {
-			return (amm1Token2Output, address(amm1));
-		} else {
-			return (amm2Token2Output, address(amm2));
-		}
-	}
-
-	// Calculates which amm has best token2 deposit value
-	function calculateBestToken2Deposit(uint256 _token2Amount)
-		public
-		view
-		returns (uint256, address)
-	{
-		uint256 amm1Token1Output = amm1.calculateToken2Deposit(_token2Amount);
-		uint256 amm2Token1Output = amm2.calculateToken2Deposit(_token2Amount);
-
-		if (amm1Token1Output > amm2Token1Output) {
-			return (amm1Token1Output, address(amm1));
-		} else {
-			return (amm2Token1Output, address(amm2));
-		}
-	}
+	// Determines how much of token2 to deposit with token1
+    function calculateToken2Deposit(uint256 _token1Amount)
+        public
+        view
+        returns (uint256 token2Amount)
+    {
+        token2Amount = (token2Balance * _token1Amount) / token1Balance;
+    }
 
     function addLiquidity(uint256 _token1Amount, uint256 _token2Amount) external {
-	    // Deposit Tokens
-	    require(
-	        token1.transferFrom(msg.sender, address(this), _token1Amount),
-	        "failed to transfer token 1"
-	    );
-	    require(
-	        token2.transferFrom(msg.sender, address(this), _token2Amount),
-	        "failed to transfer token 2"
-	    );
+        // Deposit Tokens
+        require(
+            token1.transferFrom(msg.sender, address(this), _token1Amount),
+            "failed to transfer token 1"
+        );
+        require(
+            token2.transferFrom(msg.sender, address(this), _token2Amount),
+            "failed to transfer token 2"
+        );
 
-	    diversifyLiquidity(_token1Amount, _token2Amount);
-
-	    // Issue Shares
+        // Issue Shares
         uint256 share;
 
         // If first time adding liquidity, make share 100
         if (totalShares == 0) {
             share = 100 * PRECISION;
         } else {
-            uint256 share1 = (totalShares * _token1Amount) / allocatedToken1Balance;
-            uint256 share2 = (totalShares * _token2Amount) / allocatedToken2Balance;
+            uint256 share1 = (totalShares * _token1Amount) / token1Balance;
+            uint256 share2 = (totalShares * _token2Amount) / token2Balance;
             require(
                 (share1 / 10**3) == (share2 / 10**3),
                 "must provide equal token amounts"
@@ -98,38 +82,14 @@ contract Aggregator is ReentrancyGuard {
             share = share1;
         }
 
-	    // Manage Pool
-	    allocatedToken1Balance += _token1Amount;
-	    allocatedToken2Balance += _token2Amount;
-	    K = allocatedToken1Balance * allocatedToken2Balance;
+        // Manage Pool
+        token1Balance += _token1Amount;
+        token2Balance += _token2Amount;
+        K = token1Balance * token2Balance;
 
-	    // Updates shares
+        // Updates shares
         totalShares += share;
         shares[msg.sender] += share;
-	}
-
-	function diversifyLiquidity(uint256 _token1Amount, uint256 _token2Amount) internal {
-		uint256 halvedToken1Amount = _token1Amount / 2;
-		uint256 halvedToken2Amount = _token2Amount / 2;
-
-		token1.approve(address(amm1), halvedToken1Amount);
-		token2.approve(address(amm1), halvedToken2Amount);
-		token1.approve(address(amm2), halvedToken1Amount);
-		token2.approve(address(amm2), halvedToken2Amount);
-
-		amm1.addLiquidity(halvedToken1Amount, halvedToken2Amount);
-		amm2.addLiquidity(halvedToken1Amount, halvedToken2Amount);
-	}
-
-	// Determines how many tokens will be withdrawn
-    function calculateWithdrawAmount(uint256 _share)
-        public
-        view
-        returns(uint256 token1Amount, uint256 token2Amount)
-    {
-        require(_share <= totalShares, "Must be less than total shares");
-        token1Amount = (_share * allocatedToken1Balance) / totalShares;
-        token2Amount = (_share * allocatedToken2Balance) / totalShares;
     }
 
 	// Determines best token2 output with token1 input
@@ -177,10 +137,12 @@ contract Aggregator is ReentrancyGuard {
 		if (amm == address(amm1)) {
 			token1.approve(address(amm1), _token1Amount);
 			uint256 token2Output = amm1.swapToken1(_token1Amount);
+			token2.transfer(msg.sender, token2Output);
 			return (expectedToken2Output, token2Output);
 		} else {
 			token1.approve(address(amm2), _token1Amount);
 			uint256 token2Output = amm2.swapToken1(_token1Amount);
+			token2.transfer(msg.sender, token2Output);
 			return (expectedToken2Output, token2Output);
 		}
 	}
@@ -198,10 +160,12 @@ contract Aggregator is ReentrancyGuard {
 		if (amm == address(amm1)) {
 			token2.approve(address(amm1), _token2Amount);
 			uint256 token1Output = amm1.swapToken2(_token2Amount);
+			token1.transfer(msg.sender, token1Output);
 			return (expectedToken1Output, token1Output);
 		} else {
 			token2.approve(address(amm2), _token2Amount);
 			uint256 token1Output = amm2.swapToken2(_token2Amount);
+			token1.transfer(msg.sender, token1Output);
 			return (expectedToken1Output, token1Output);
 		}
 	}
