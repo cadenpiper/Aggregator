@@ -99,11 +99,11 @@ describe('Aggregator', () => {
 		})
 
 		it('calculates token1 deposit output', async () => {
-			const token1Output = await aggregator.connect(liquidityProvider).calculateToken1Deposit(tokens(50))
+			expect(await aggregator.connect(liquidityProvider).calculateToken1Deposit(tokens(50))).to.equal(tokens(40))
 		})
 
 		it('calculates token2 deposit output', async () => {
-			const token2Output = await aggregator.connect(liquidityProvider).calculateToken2Deposit(tokens(50))
+			expect(await aggregator.connect(liquidityProvider).calculateToken2Deposit(tokens(50))).to.equal(tokens(62.5))
 		})
 	})
 
@@ -169,7 +169,7 @@ describe('Aggregator', () => {
 			await transaction.wait()
 		})
 
-		it('calculates withdrawal amount', async () => {
+		it('calculates withdrawal amounts', async () => {
 			// Calculate withdrawal amounts
 			const [token1Amount, token2Amount] = await aggregator.connect(liquidityProvider).calculateWithdrawalAmount(tokens(10))
 
@@ -229,11 +229,9 @@ describe('Aggregator', () => {
 
 			const[bestToken2Output, bestAmm] = await aggregator.getBestToken1Price(tokens(100))
 
-			/*console.log(`AMM1 token2 output: ${ethers.utils.formatEther(token2OutputAmm1)}`)
-			console.log(`AMM2 token2 output: ${ethers.utils.formatEther(token2OutputAmm2)}`)
-			
-			console.log(`Best token2 output: ${ethers.utils.formatEther(bestToken2Output)}`)
-			console.log(`Corresponding AMM: ${bestAmm}`)*/
+			expect(token2OutputAmm2).to.be.gt(token2OutputAmm1)
+			expect(bestToken2Output).to.equal(token2OutputAmm2)
+			expect(bestAmm).to.equal(amm2.address)
 		})
 
 		it('gets best token1 price and amm', async () => {
@@ -242,11 +240,9 @@ describe('Aggregator', () => {
 
 			const[bestToken1Output, bestAmm] = await aggregator.getBestToken2Price(tokens(100))
 
-			/*console.log(`AMM1 token1 output: ${ethers.utils.formatEther(token1OutputAmm1)}`)
-			console.log(`AMM2 token1 output: ${ethers.utils.formatEther(token1OutputAmm2)}`)
-			
-			console.log(`Best token1 output: ${ethers.utils.formatEther(bestToken1Output)}`)
-			console.log(`Corresponding AMM: ${bestAmm}`)*/
+			expect(token1OutputAmm1).to.be.gt(token1OutputAmm2)
+			expect(bestToken1Output).to.equal(token1OutputAmm1)
+			expect(bestAmm).to.equal(amm1.address)
 		})
 	})
 
