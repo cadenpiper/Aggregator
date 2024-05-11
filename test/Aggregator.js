@@ -107,7 +107,7 @@ describe('Aggregator', () => {
 		})
 	})
 
-	describe('Add Liquidity', () => {
+	describe('Adding Liquidity', () => {
 		let transaction
 
 		beforeEach(async () => {
@@ -151,6 +151,54 @@ describe('Aggregator', () => {
 			// Calculates shares
 			expect(await aggregator.shares(liquidityProvider.address)).to.equal(tokens(100))
 			expect(await aggregator.shares(investor1.address)).to.equal(tokens(50))
+		})
+	})
+
+	describe('Removing Liquidity', () => {
+		let transaction
+
+		beforeEach(async () => {
+			// Liqudity provider approves tokens for aggregator
+			transaction = await token1.connect(liquidityProvider).approve(aggregator.address, tokens(500))
+			await transaction.wait()
+			transaction = await token2.connect(liquidityProvider).approve(aggregator.address, tokens(500))
+			await transaction.wait()
+
+			// Add liquidity
+			transaction = await aggregator.connect(liquidityProvider).addLiquidity(tokens(500), tokens(500))
+			await transaction.wait()
+		})
+
+		it('calculates withdrawal amount', async () => {
+			// Calculate withdrawal amounts
+			const [token1Amount, token2Amount] = await aggregator.connect(liquidityProvider).calculateWithdrawalAmount(tokens(10))
+
+			expect(token1Amount).to.equal(tokens(50))
+			expect(token2Amount).to.equal(tokens(50))
+		})
+
+		it('removes liquidity', async () => {
+			// Liquidity provider and aggregator balances before removing liquidity
+			const balanceToken1Before = await token1.balanceOf(liquidityProvider.address)
+			const balanceToken2Before = await token2.balanceOf(liquidityProvider.address)
+
+			const aggregatorToken1Before = await token1.balanceOf(aggregator.address)
+			const aggregatorToken2Before = await token2.balanceOf(aggregator.address)
+
+			// Remove liquidity
+			const result = await aggregator.connect(liquidityProvider).removeLiquidity(tokens(50))
+
+			// Liquidity provider and aggregator balances after removing liquidity
+			const balanceToken1After = await token1.balanceOf(liquidityProvider.address)
+			const balanceToken2After = await token2.balanceOf(liquidityProvider.address)
+
+			const aggregatorToken1After = await token1.balanceOf(aggregator.address)
+			const aggregatorToken2After = await token2.balanceOf(aggregator.address)
+
+			expect(balanceToken1After).to.be.gt(balanceToken1Before)
+			expect(balanceToken2After).to.be.gt(balanceToken2Before)
+			expect(aggregatorToken1Before).to.be.gt(aggregatorToken1After)
+			expect(aggregatorToken2Before).to.be.gt(aggregatorToken2After)
 		})
 	})
 
@@ -290,6 +338,48 @@ describe('Aggregator', () => {
 
 			expect(investorToken1After).to.be.gt(investorToken1Before)
 			expect(investorToken2After).to.be.lt(investorToken2Before)
+		})
+
+		it('emits ExecuteSwap event', async () => {
+			// Get estimated output price
+			const [estimate, amm] = await aggregator.getBestToken2Price(tokens(500))
+
+			// Swap tokens
+			transaction = await aggregator.connect(investor1).executeSwapToken2(tokens(500))
+			await transaction.wait()
+
+			await expect(transaction).to.emit(aggregator, 'ExecuteSwap')
+        .withArgs(
+          investor1.address,
+          token2.address,
+          tokens(500),
+          token1.address,
+          estimate,
+          await aggregator.token1Balance(),
+          await aggregator.token2Balance(),
+          (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
+      )
+		})
+
+		it('emits ExecuteSwap event', async () => {
+			// Get estimated output price
+			const [estimate, amm] = await aggregator.getBestToken1Price(tokens(500))
+
+			// Swap tokens
+			transaction = await aggregator.connect(investor1).executeSwapToken1(tokens(500))
+			await transaction.wait()
+
+			await expect(transaction).to.emit(aggregator, 'ExecuteSwap')
+        .withArgs(
+          investor1.address,
+          token1.address,
+          tokens(500),
+          token2.address,
+          estimate,
+          await aggregator.token1Balance(),
+          await aggregator.token2Balance(),
+          (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
+      )
 		})
 	})
 })

@@ -153,9 +153,9 @@ describe('AMM', () => {
       await expect(transaction).to.emit(amm, 'Swap')
         .withArgs(
           investor1.address,
-          token1.address,
-          tokens(1),
           token2.address,
+          tokens(1),
+          token1.address,
           estimate,
           await amm.token1Balance(),
           await amm.token2Balance(),

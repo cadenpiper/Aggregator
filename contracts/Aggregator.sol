@@ -22,6 +22,17 @@ contract Aggregator is ReentrancyGuard {
     mapping(address => uint256) public shares;
     uint256 constant PRECISION = 10**18;
 
+    event ExecuteSwap(
+    	address user,
+    	address tokenIn,
+    	uint256 tokenInAmount,
+    	address tokenOut,
+    	uint256 tokenOutAmount,
+    	uint256 token1Balance,
+    	uint256 token2Balance,
+    	uint256 timestamp
+    );
+
 	constructor(
 		string memory _name,
 		Token _token1,
@@ -92,6 +103,40 @@ contract Aggregator is ReentrancyGuard {
         shares[msg.sender] += share;
     }
 
+    // Determines how many tokens will be withdrawn
+    function calculateWithdrawalAmount(uint256 _share)
+        public
+        view
+        returns(uint256 token1Amount, uint256 token2Amount)
+    {
+        require(_share <= totalShares, "Must be less than total shares");
+        token1Amount = (_share * token1Balance) / totalShares;
+        token2Amount = (_share * token2Balance) / totalShares;
+    }
+
+    // Removes liquidity from the pool
+    function removeLiquidity(uint256 _share)
+        external
+        returns(uint256 token1Amount, uint256 token2Amount)
+    {
+        require(
+            _share <= shares[msg.sender],
+            "Cannot withdraw more shares than you have"
+        );
+
+        (token1Amount, token2Amount) = calculateWithdrawalAmount(_share);
+
+        shares[msg.sender] -= _share;
+        totalShares -= _share;
+
+        token1Balance -= token1Amount;
+        token2Balance -= token2Amount;
+        K = token1Balance * token2Balance;
+
+        token1.transfer(msg.sender, token1Amount);
+        token2.transfer(msg.sender, token2Amount);
+    }
+
 	// Determines best token2 output with token1 input
 	function getBestToken1Price(uint256 _token1Amount)
 		public
@@ -138,11 +183,35 @@ contract Aggregator is ReentrancyGuard {
 			token1.approve(address(amm1), _token1Amount);
 			uint256 token2Output = amm1.swapToken1(_token1Amount);
 			token2.transfer(msg.sender, token2Output);
+
+			emit ExecuteSwap(
+		    	msg.sender,
+		    	address(token1),
+		    	_token1Amount,
+		    	address(token2),
+		    	expectedToken2Output,
+		    	token1Balance,
+		    	token2Balance,
+		    	block.timestamp
+    		);
+
 			return (expectedToken2Output, token2Output);
 		} else {
 			token1.approve(address(amm2), _token1Amount);
 			uint256 token2Output = amm2.swapToken1(_token1Amount);
 			token2.transfer(msg.sender, token2Output);
+
+			emit ExecuteSwap(
+		    	msg.sender,
+		    	address(token1),
+		    	_token1Amount,
+		    	address(token2),
+		    	expectedToken2Output,
+		    	token1Balance,
+		    	token2Balance,
+		    	block.timestamp
+    		);
+
 			return (expectedToken2Output, token2Output);
 		}
 	}
@@ -161,11 +230,35 @@ contract Aggregator is ReentrancyGuard {
 			token2.approve(address(amm1), _token2Amount);
 			uint256 token1Output = amm1.swapToken2(_token2Amount);
 			token1.transfer(msg.sender, token1Output);
+
+			emit ExecuteSwap(
+		    	msg.sender,
+		    	address(token2),
+		    	_token2Amount,
+		    	address(token1),
+		    	expectedToken1Output,
+		    	token1Balance,
+		    	token2Balance,
+		    	block.timestamp
+    		);
+
 			return (expectedToken1Output, token1Output);
 		} else {
 			token2.approve(address(amm2), _token2Amount);
 			uint256 token1Output = amm2.swapToken2(_token2Amount);
 			token1.transfer(msg.sender, token1Output);
+
+			emit ExecuteSwap(
+		    	msg.sender,
+		    	address(token2),
+		    	_token2Amount,
+		    	address(token1),
+		    	expectedToken1Output,
+		    	token1Balance,
+		    	token2Balance,
+		    	block.timestamp
+    		);
+
 			return (expectedToken1Output, token1Output);
 		}
 	}
