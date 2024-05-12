@@ -12,7 +12,8 @@ describe('Aggregator', () => {
 	let accounts,
 			deployer,
 			liquidityProvider,
-			investor1
+			investor1,
+			feeAccount
 
 	let token1,
 			token2,
@@ -28,6 +29,7 @@ describe('Aggregator', () => {
 		deployer = accounts[0]
 		liquidityProvider = accounts[1]
 		investor1 = accounts[2]
+		feeAccount = accounts[3]
 
 		// Deploy token contracts
 		const Token = await ethers.getContractFactory('Token')
@@ -50,7 +52,8 @@ describe('Aggregator', () => {
     	token1.address,
     	token2.address,
     	amm1.address,
-    	amm2.address
+    	amm2.address,
+    	feeAccount.address
     )
     await aggregator.deployed()
 

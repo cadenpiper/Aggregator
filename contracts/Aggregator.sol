@@ -13,6 +13,7 @@ contract Aggregator is ReentrancyGuard {
 	AMM public amm1;
 	AMM public amm2;
 	address public owner;
+	address public feeAccount;
 
 	uint256 public token1Balance;
     uint256 public token2Balance;
@@ -38,7 +39,8 @@ contract Aggregator is ReentrancyGuard {
 		Token _token1,
 		Token _token2,
 		AMM _amm1,
-		AMM _amm2
+		AMM _amm2,
+		address _feeAccount
 	) {
 		name = _name;
 		token1 = _token1;
@@ -46,6 +48,7 @@ contract Aggregator is ReentrancyGuard {
 		amm1 = _amm1;
 		amm2 = _amm2;
 		owner = msg.sender;
+		feeAccount = _feeAccount;
 	}
 
 	// Determines how much of token1 to deposit with token2
@@ -66,7 +69,10 @@ contract Aggregator is ReentrancyGuard {
         token2Amount = (token2Balance * _token1Amount) / token1Balance;
     }
 
-    function addLiquidity(uint256 _token1Amount, uint256 _token2Amount) external {
+    function addLiquidity(uint256 _token1Amount, uint256 _token2Amount)
+    	external
+    	nonReentrant
+    {
         // Deposit Tokens
         require(
             token1.transferFrom(msg.sender, address(this), _token1Amount),
@@ -117,7 +123,8 @@ contract Aggregator is ReentrancyGuard {
     // Removes liquidity from the pool
     function removeLiquidity(uint256 _share)
         external
-        returns(uint256 token1Amount, uint256 token2Amount)
+        nonReentrant
+        returns (uint256 token1Amount, uint256 token2Amount)
     {
         require(
             _share <= shares[msg.sender],
@@ -172,94 +179,72 @@ contract Aggregator is ReentrancyGuard {
 	// Swaps token1 for best price --- receives token2
 	function executeSwapToken1(uint256 _token1Amount)
 		external
+		nonReentrant
 		returns (uint256, uint256)
 	{
 		(uint256 expectedToken2Output, address amm) = getBestToken1Price(_token1Amount);
+		uint256 token2Output;
 
 		token1.approve(address(this), _token1Amount);
 		token1.transferFrom(msg.sender, address(this), _token1Amount);
 
 		if (amm == address(amm1)) {
 			token1.approve(address(amm1), _token1Amount);
-			uint256 token2Output = amm1.swapToken1(_token1Amount);
+			token2Output = amm1.swapToken1(_token1Amount);
 			token2.transfer(msg.sender, token2Output);
-
-			emit ExecuteSwap(
-		    	msg.sender,
-		    	address(token1),
-		    	_token1Amount,
-		    	address(token2),
-		    	expectedToken2Output,
-		    	token1Balance,
-		    	token2Balance,
-		    	block.timestamp
-    		);
-
-			return (expectedToken2Output, token2Output);
 		} else {
 			token1.approve(address(amm2), _token1Amount);
-			uint256 token2Output = amm2.swapToken1(_token1Amount);
+			token2Output = amm2.swapToken1(_token1Amount);
 			token2.transfer(msg.sender, token2Output);
-
-			emit ExecuteSwap(
-		    	msg.sender,
-		    	address(token1),
-		    	_token1Amount,
-		    	address(token2),
-		    	expectedToken2Output,
-		    	token1Balance,
-		    	token2Balance,
-		    	block.timestamp
-    		);
-
-			return (expectedToken2Output, token2Output);
 		}
+
+		emit ExecuteSwap(
+	    	msg.sender,
+	    	address(token1),
+	    	_token1Amount,
+	    	address(token2),
+	    	expectedToken2Output,
+	    	token1Balance,
+	    	token2Balance,
+	    	block.timestamp
+		);
+
+		return (expectedToken2Output, token2Output);
 	}
 
 	// Swaps token1 for best price --- receives token2
 	function executeSwapToken2(uint256 _token2Amount)
 		external
+		nonReentrant
 		returns (uint256, uint256)
 	{
 		(uint256 expectedToken1Output, address amm) = getBestToken2Price(_token2Amount);
+		uint256 token1Output;
 
 		token2.approve(address(this), _token2Amount);
 		token2.transferFrom(msg.sender, address(this), _token2Amount);
 
 		if (amm == address(amm1)) {
 			token2.approve(address(amm1), _token2Amount);
-			uint256 token1Output = amm1.swapToken2(_token2Amount);
+			token1Output = amm1.swapToken2(_token2Amount);
 			token1.transfer(msg.sender, token1Output);
-
-			emit ExecuteSwap(
-		    	msg.sender,
-		    	address(token2),
-		    	_token2Amount,
-		    	address(token1),
-		    	expectedToken1Output,
-		    	token1Balance,
-		    	token2Balance,
-		    	block.timestamp
-    		);
-
-			return (expectedToken1Output, token1Output);
 		} else {
 			token2.approve(address(amm2), _token2Amount);
-			uint256 token1Output = amm2.swapToken2(_token2Amount);
+			token1Output = amm2.swapToken2(_token2Amount);
 			token1.transfer(msg.sender, token1Output);
-
-			emit ExecuteSwap(
-		    	msg.sender,
-		    	address(token2),
-		    	_token2Amount,
-		    	address(token1),
-		    	expectedToken1Output,
-		    	token1Balance,
-		    	token2Balance,
-		    	block.timestamp
-    		);
-
-			return (expectedToken1Output, token1Output);
 		}
+
+		emit ExecuteSwap(
+	    	msg.sender,
+	    	address(token2),
+	    	_token2Amount,
+	    	address(token1),
+	    	expectedToken1Output,
+	    	token1Balance,
+	    	token2Balance,
+	    	block.timestamp
+		);
+
+    	return (expectedToken1Output, token1Output);
 	}
 }
