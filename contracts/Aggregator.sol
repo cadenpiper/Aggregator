@@ -13,7 +13,6 @@ contract Aggregator is ReentrancyGuard {
 	AMM public amm1;
 	AMM public amm2;
 	address public owner;
-	address public feeAccount;
 
 	uint256 public token1Balance;
     uint256 public token2Balance;
@@ -39,8 +38,7 @@ contract Aggregator is ReentrancyGuard {
 		Token _token1,
 		Token _token2,
 		AMM _amm1,
-		AMM _amm2,
-		address _feeAccount
+		AMM _amm2
 	) {
 		name = _name;
 		token1 = _token1;
@@ -48,7 +46,6 @@ contract Aggregator is ReentrancyGuard {
 		amm1 = _amm1;
 		amm2 = _amm2;
 		owner = msg.sender;
-		feeAccount = _feeAccount;
 	}
 
 	// Determines how much of token1 to deposit with token2
